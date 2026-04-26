@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>STT Groq</title>
+<style>
+*{margin:0;box-sizing:border-box}
+body{font:16px/1.6 system-ui,sans-serif;background:#0d1117;color:#e6edf3;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;width:min(480px,90vw)}
+h1{font-size:1.3rem;margin-bottom:16px;font-weight:600}
+textarea{width:100%;min-height:120px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;padding:12px;font:inherit;resize:vertical;margin-bottom:12px}
+textarea:focus{outline:none;border-color:#58a6ff}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+button{flex:1;padding:10px 0;border:none;border-radius:8px;font:inherit;font-weight:600;cursor:pointer;transition:opacity .15s}
+button:active{opacity:.7}
+button:disabled{opacity:.4;cursor:not-allowed}
+#rec{background:#238636;color:#fff;min-width:120px}
+#rec.recording{background:#da3633}
+#copy{background:#30363d;color:#e6edf3}
+#status{margin:12px 0;font-size:.85rem;color:#8b949e}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🎙 STT Groq</h1>
+  <textarea id="out" readonly placeholder="Текст появится здесь…"></textarea>
+  <div id="status">Ready</div>
+  <div class="row">
+    <button id="rec">Record</button>
+    <button id="copy" disabled>Copy</button>
+  </div>
+</div>
+<script>
+const rec = document.getElementById('rec');
+const out = document.getElementById('out');
+const copy = document.getElementById('copy');
+const status = document.getElementById('status');
+
+let mediaRec = null, chunks = [];
+
+rec.onclick = async () => {
+  if (!mediaRec) {
+    /* start */
+    chunks = [];
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    mediaRec = new MediaRecorder(stream);
+    mediaRec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+    mediaRec.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      mediaRec = null;
+      rec.textContent = 'Record';
+      rec.classList.remove('recording');
+      status.textContent = 'Processing…';
+      rec.disabled = true;
+
+      const blob = new Blob(chunks, {type:'audio/webm'});
+      const fd = new FormData();
+      fd.append('file', blob, 'audio.webm');
+
+      try {
+        const r = await fetch('/api/transcribe', {method:'POST', body:fd});
+        const j = await r.json();
+        out.value = j.text || '';
+        copy.disabled = !out.value;
+      } catch(e) {
+        out.value = 'Error: ' + e.message;
+      } finally {
+        status.textContent = 'Ready';
+        rec.disabled = false;
+      }
+    };
+    mediaRec.start();
+    rec.textContent = 'Stop';
+    rec.classList.add('recording');
+    status.textContent = 'Recording…';
+  } else {
+    /* stop */
+    mediaRec.stop();
+  }
+};
+
+copy.onclick = () => {
+  navigator.clipboard.writeText(out.value).then(() => {
+    copy.textContent = 'Copied!';
+    setTimeout(() => copy.textContent = 'Copy', 1200);
+  });
+};
+</script>
+</body>
+</html>
