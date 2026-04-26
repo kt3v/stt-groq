@@ -7,6 +7,9 @@ from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from groq import Groq
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI(title="STT Groq")
 
