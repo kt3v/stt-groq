@@ -4,7 +4,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from groq import Groq
 from dotenv import load_dotenv
@@ -28,7 +28,7 @@ async def index():
 
 
 @app.post("/api/transcribe")
-async def transcribe(file: UploadFile = File(...)):
+async def transcribe(file: UploadFile = File(...), language: str = Form("auto")):
     if not file.content_type or not file.content_type.startswith("audio/"):
         raise HTTPException(400, "Only audio files are accepted")
 
@@ -38,13 +38,13 @@ async def transcribe(file: UploadFile = File(...)):
             tmp.write(await file.read())
             tmp.flush()
 
+            kwargs = dict(model="whisper-large-v3", file=None, response_format="json")
+            if language != "auto":
+                kwargs["language"] = language
+
             with open(tmp.name, "rb") as audio:
-                transcript = client.audio.transcriptions.create(
-                    model="whisper-large-v3",
-                    file=audio,
-                    response_format="json",
-                    language="ru",
-                )
+                kwargs["file"] = audio
+                transcript = client.audio.transcriptions.create(**kwargs)
 
             return JSONResponse({"text": transcript.text})
         except Exception as e:

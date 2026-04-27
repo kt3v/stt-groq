@@ -18,6 +18,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #rec{background:#238636;color:#fff;min-width:120px}
 #rec.recording{background:#da3633}
 #copy{background:#30363d;color:#e6edf3}
+#lang{background:#30363d;color:#e6edf3;border:none;border-radius:8px;padding:10px 8px;font:inherit;cursor:pointer}
 #status{margin:12px 0;font-size:.85rem;color:#8b949e}
 </style>
 </head>
@@ -29,6 +30,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
   <div class="row">
     <button id="rec">Record</button>
     <button id="copy" disabled>Copy</button>
+    <select id="lang"></select>
   </div>
 </div>
 <script>
@@ -36,6 +38,27 @@ const rec = document.getElementById('rec');
 const out = document.getElementById('out');
 const copy = document.getElementById('copy');
 const status = document.getElementById('status');
+const lang = document.getElementById('lang');
+
+const LANGUAGES = [
+  ['auto', 'Auto'],
+  ['en', 'English'],
+  ['ru', 'Russian'],
+  ['de', 'Deutsch'],
+  ['fr', 'Français'],
+  ['es', 'Español'],
+  ['zh', 'Chinese'],
+  ['ja', 'Japanese'],
+  ['ar', 'Arabic'],
+];
+LANGUAGES.forEach(([code, label]) => {
+  const opt = document.createElement('option');
+  opt.value = code;
+  opt.textContent = label;
+  lang.appendChild(opt);
+});
+lang.value = localStorage.getItem('stt_lang') || 'auto';
+lang.onchange = () => localStorage.setItem('stt_lang', lang.value);
 
 let mediaRec = null, chunks = [];
 
@@ -57,6 +80,7 @@ rec.onclick = async () => {
       const blob = new Blob(chunks, {type:'audio/webm'});
       const fd = new FormData();
       fd.append('file', blob, 'audio.webm');
+      fd.append('language', lang.value);
 
       try {
         const r = await fetch('/api/transcribe', {method:'POST', body:fd});
@@ -79,6 +103,13 @@ rec.onclick = async () => {
     mediaRec.stop();
   }
 };
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !rec.disabled && document.activeElement !== out) {
+    e.preventDefault();
+    rec.click();
+  }
+});
 
 copy.onclick = () => {
   navigator.clipboard.writeText(out.value).then(() => {
