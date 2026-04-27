@@ -51,3 +51,5 @@ Create `.env` in the project root:
 ## License
 
 MIT
+
+weird_drop by [\[indie-indie\]](https://x.com/1hrOk)
