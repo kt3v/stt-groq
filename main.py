@@ -11,7 +11,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from groq import Groq
 from pydantic import BaseModel
 
@@ -88,9 +88,24 @@ async def auth_status(x_session_token: str = Header(None)):
     raise HTTPException(401, "Unauthorized")
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 async def index():
-    return (STATIC_DIR / "index.html").read_text()
+    return HTMLResponse((STATIC_DIR / "index.html").read_text())
+
+
+@app.get("/manifest.json")
+async def manifest():
+    return FileResponse(STATIC_DIR / "manifest.json", media_type="application/manifest+json")
+
+
+@app.get("/sw.js")
+async def service_worker():
+    return FileResponse(STATIC_DIR / "sw.js", media_type="application/javascript")
+
+
+@app.get("/icon.svg")
+async def icon():
+    return FileResponse(STATIC_DIR / "icon.svg", media_type="image/svg+xml")
 
 
 @app.post("/api/transcribe", dependencies=[Depends(_require_auth)])
