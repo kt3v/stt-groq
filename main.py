@@ -3,13 +3,14 @@
 import json
 import os
 import re
+import secrets
 import tempfile
 import uuid
 from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from groq import Groq
 from pydantic import BaseModel
@@ -21,6 +22,9 @@ app = FastAPI(title="STT Groq")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     raise RuntimeError("GROQ_API_KEY env var is required")
+
+APP_PASSWORD = os.getenv("APP_PASSWORD", "")
+_sessions: set[str] = set()
 
 MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
 MINIMAX_BASE_URL = "https://api.minimax.io/v1"
@@ -44,6 +48,10 @@ def _save_prompts(prompts: list) -> None:
     )
 
 
+class AuthRequest(BaseModel):
+    password: str
+
+
 class PromptCreate(BaseModel):
     prompt: str
 
@@ -53,12 +61,39 @@ class CorrectRequest(BaseModel):
     prompt: str
 
 
+async def _require_auth(x_session_token: str = Header(None)) -> None:
+    if not APP_PASSWORD:
+        return
+    if not x_session_token or x_session_token not in _sessions:
+        raise HTTPException(401, "Unauthorized")
+
+
+@app.post("/api/auth")
+async def authenticate(body: AuthRequest):
+    if not APP_PASSWORD:
+        return {"token": ""}
+    if body.password != APP_PASSWORD:
+        raise HTTPException(401, "Wrong password")
+    token = secrets.token_hex(32)
+    _sessions.add(token)
+    return {"token": token}
+
+
+@app.get("/api/auth/status")
+async def auth_status(x_session_token: str = Header(None)):
+    if not APP_PASSWORD:
+        return {"ok": True}
+    if x_session_token and x_session_token in _sessions:
+        return {"ok": True}
+    raise HTTPException(401, "Unauthorized")
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
     return (STATIC_DIR / "index.html").read_text()
 
 
-@app.post("/api/transcribe")
+@app.post("/api/transcribe", dependencies=[Depends(_require_auth)])
 async def transcribe(file: UploadFile = File(...), language: str = Form("auto")):
     if not file.content_type or not file.content_type.startswith("audio/"):
         raise HTTPException(400, "Only audio files are accepted")
@@ -110,7 +145,7 @@ async def delete_prompt(prompt_id: str):
     return {"ok": True}
 
 
-@app.post("/api/correct")
+@app.post("/api/correct", dependencies=[Depends(_require_auth)])
 async def correct_text(body: CorrectRequest):
     text = body.text.strip()
     prompt_text = body.prompt.strip()

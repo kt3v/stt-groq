@@ -37,9 +37,29 @@ button:disabled{opacity:.3;cursor:not-allowed}
 .prompt-wrapper{position:relative;display:inline-flex}
 .del{display:none;position:absolute;top:-6px;right:-6px;background:#da3633;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:16px;text-align:center;cursor:pointer;user-select:none;z-index:1}
 .prompt-wrapper:hover .del{display:block}
+/* Password modal */
+#pw-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);align-items:center;justify-content:center;z-index:100}
+#pw-box{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:32px 28px;display:flex;flex-direction:column;gap:14px;width:min(300px,90vw);text-align:center}
+#pw-box h2{font-size:.95rem;font-weight:600;color:#8b949e;margin:0}
+#pw-input{background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font:inherit;font-size:1rem;padding:10px 14px;width:100%;text-align:center;letter-spacing:.1em}
+#pw-input:focus{outline:none;border-color:#58a6ff}
+#pw-submit{background:#238636;color:#fff;width:100%;padding:10px}
+#pw-error{color:#f85149;font-size:.8rem;min-height:1em}
 </style>
 </head>
 <body>
+
+<div id="pw-modal">
+  <div id="pw-box">
+    <h2>Enter Password</h2>
+    <form id="pw-form">
+      <input id="pw-input" type="password" autocomplete="current-password" autofocus>
+      <div id="pw-error"></div>
+      <button id="pw-submit" type="submit">Unlock</button>
+    </form>
+  </div>
+</div>
+
 <div class="wrap">
   <select id="lang"></select>
   <textarea id="out" placeholder="Your transcription will appear here…"></textarea>
@@ -71,6 +91,10 @@ const addForm = document.getElementById('add-form');
 const newPromptTA = document.getElementById('new-prompt');
 const savePromptBtn = document.getElementById('save-prompt');
 const cancelPromptBtn = document.getElementById('cancel-prompt');
+const pwModal = document.getElementById('pw-modal');
+const pwForm = document.getElementById('pw-form');
+const pwInput = document.getElementById('pw-input');
+const pwError = document.getElementById('pw-error');
 
 const LANGUAGES = [
   ['auto', 'Auto'],
@@ -92,6 +116,62 @@ LANGUAGES.forEach(([code, label]) => {
 lang.value = localStorage.getItem('stt_lang') || 'auto';
 lang.onchange = () => localStorage.setItem('stt_lang', lang.value);
 
+// ── Auth ──────────────────────────────────────────────────────────────────────
+let sessionToken = localStorage.getItem('stt_token') || '';
+let authVerified = false;
+
+const authReadyPromise = (async () => {
+  try {
+    const headers = sessionToken ? {'X-Session-Token': sessionToken} : {};
+    const r = await fetch('/api/auth/status', {headers});
+    if (r.ok) { authVerified = true; return; }
+  } catch (_) {}
+  sessionToken = '';
+  localStorage.removeItem('stt_token');
+})();
+
+function ensureAuth() {
+  return authReadyPromise.then(() => {
+    if (authVerified) return true;
+    return new Promise(resolve => {
+      pwModal.style.display = 'flex';
+      pwInput.value = '';
+      pwError.textContent = '';
+      setTimeout(() => pwInput.focus(), 0);
+
+      pwForm.onsubmit = async e => {
+        e.preventDefault();
+        pwError.textContent = '';
+        try {
+          const r = await fetch('/api/auth', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({password: pwInput.value}),
+          });
+          if (r.ok) {
+            const j = await r.json();
+            sessionToken = j.token;
+            if (sessionToken) localStorage.setItem('stt_token', sessionToken);
+            authVerified = true;
+            pwModal.style.display = 'none';
+            resolve(true);
+          } else {
+            pwError.textContent = 'Wrong password';
+            pwInput.select();
+          }
+        } catch (_) {
+          pwError.textContent = 'Network error';
+        }
+      };
+    });
+  });
+}
+
+function authHeaders() {
+  return sessionToken ? {'X-Session-Token': sessionToken} : {};
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 let mediaRec = null, chunks = [];
 
 rec.onclick = async () => {
@@ -105,16 +185,18 @@ rec.onclick = async () => {
       mediaRec = null;
       rec.textContent = 'Record';
       rec.classList.remove('recording');
-      status.textContent = 'Processing...';
       rec.disabled = true;
 
+      if (!(await ensureAuth())) { rec.disabled = false; status.textContent = 'Ready'; return; }
+
+      status.textContent = 'Processing...';
       const blob = new Blob(chunks, {type:'audio/webm'});
       const fd = new FormData();
       fd.append('file', blob, 'audio.webm');
       fd.append('language', lang.value);
 
       try {
-        const r = await fetch('/api/transcribe', {method:'POST', body:fd});
+        const r = await fetch('/api/transcribe', {method:'POST', headers: authHeaders(), body:fd});
         const j = await r.json();
         out.value = j.text || '';
         copy.disabled = !out.value;
@@ -135,7 +217,7 @@ rec.onclick = async () => {
 };
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'Space' && !rec.disabled && document.activeElement !== out && document.activeElement !== newPromptTA) {
+  if (e.code === 'Space' && !rec.disabled && document.activeElement !== out && document.activeElement !== newPromptTA && pwModal.style.display === 'none') {
     e.preventDefault();
     rec.click();
   }
@@ -160,12 +242,15 @@ function makePromptButton(p) {
   btn.onclick = async () => {
     const text = out.value.trim();
     if (!text) return;
+
+    if (!(await ensureAuth())) return;
+
     status.textContent = 'Correcting…';
     btn.disabled = true;
     try {
       const r = await fetch('/api/correct', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', ...authHeaders()},
         body: JSON.stringify({text, prompt: p.prompt}),
       });
       if (!r.ok) { const t = await r.text(); throw new Error(t); }
