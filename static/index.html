@@ -119,19 +119,28 @@ lang.onchange = () => localStorage.setItem('stt_lang', lang.value);
 // ── Auth ──────────────────────────────────────────────────────────────────────
 let sessionToken = localStorage.getItem('stt_token') || '';
 let authVerified = false;
+let authInitDone = false;
 
 const authReadyPromise = (async () => {
-  try {
-    const headers = sessionToken ? {'X-Session-Token': sessionToken} : {};
-    const r = await fetch('/api/auth/status', {headers});
-    if (r.ok) { authVerified = true; return; }
-  } catch (_) {}
-  sessionToken = '';
-  localStorage.removeItem('stt_token');
+  if (sessionToken) {
+    try {
+      const r = await fetch('/api/auth/status', {headers: {'X-Session-Token': sessionToken}});
+      if (r.ok) authVerified = true;
+      else { sessionToken = ''; localStorage.removeItem('stt_token'); }
+    } catch (_) {}
+  }
+  authInitDone = true;
 })();
 
+function resetAuth() {
+  authVerified = false;
+  sessionToken = '';
+  localStorage.removeItem('stt_token');
+}
+
 function ensureAuth() {
-  return authReadyPromise.then(() => {
+  const waitReady = authInitDone ? Promise.resolve() : authReadyPromise;
+  return waitReady.then(() => {
     if (authVerified) return true;
     return new Promise(resolve => {
       pwModal.style.display = 'flex';
@@ -170,6 +179,18 @@ function ensureAuth() {
 function authHeaders() {
   return sessionToken ? {'X-Session-Token': sessionToken} : {};
 }
+
+async function fetchWithAuth(url, options = {}) {
+  const makeHeaders = () => ({...(options.headers || {}), ...authHeaders()});
+  let r = await fetch(url, {...options, headers: makeHeaders()});
+  if (r.status === 401) {
+    resetAuth();
+    const ok = await ensureAuth();
+    if (!ok) throw new Error('Unauthorized');
+    r = await fetch(url, {...options, headers: makeHeaders()});
+  }
+  return r;
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 let mediaRec = null, chunks = [];
@@ -187,8 +208,6 @@ rec.onclick = async () => {
       rec.classList.remove('recording');
       rec.disabled = true;
 
-      if (!(await ensureAuth())) { rec.disabled = false; status.textContent = 'Ready'; return; }
-
       status.textContent = 'Processing...';
       const blob = new Blob(chunks, {type:'audio/webm'});
       const fd = new FormData();
@@ -196,7 +215,7 @@ rec.onclick = async () => {
       fd.append('language', lang.value);
 
       try {
-        const r = await fetch('/api/transcribe', {method:'POST', headers: authHeaders(), body:fd});
+        const r = await fetchWithAuth('/api/transcribe', {method:'POST', body:fd});
         const j = await r.json();
         out.value = j.text || '';
         copy.disabled = !out.value;
@@ -243,14 +262,12 @@ function makePromptButton(p) {
     const text = out.value.trim();
     if (!text) return;
 
-    if (!(await ensureAuth())) return;
-
     status.textContent = 'Correcting…';
     btn.disabled = true;
     try {
-      const r = await fetch('/api/correct', {
+      const r = await fetchWithAuth('/api/correct', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json', ...authHeaders()},
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({text, prompt: p.prompt}),
       });
       if (!r.ok) { const t = await r.text(); throw new Error(t); }
