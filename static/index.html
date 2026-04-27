@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -24,7 +24,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 <body>
 <div class="card">
   <h1>🎙 STT Groq</h1>
-  <textarea id="out" readonly placeholder="Текст появится здесь…"></textarea>
+  <textarea id="out" readonly placeholder="Transcription will appear here…"></textarea>
   <div id="status">Ready</div>
   <div class="row">
     <button id="rec">Record</button>
@@ -51,7 +51,7 @@ rec.onclick = async () => {
       mediaRec = null;
       rec.textContent = 'Record';
       rec.classList.remove('recording');
-      status.textContent = 'Processing…';
+      status.textContent = 'Processing...';
       rec.disabled = true;
 
       const blob = new Blob(chunks, {type:'audio/webm'});
@@ -73,7 +73,7 @@ rec.onclick = async () => {
     mediaRec.start();
     rec.textContent = 'Stop';
     rec.classList.add('recording');
-    status.textContent = 'Recording…';
+    status.textContent = 'Recording...';
   } else {
     /* stop */
     mediaRec.stop();
