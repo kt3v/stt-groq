@@ -1,13 +1,18 @@
-"""STT Groq — FastAPI backend with Groq Whisper."""
+"""STT Groq — FastAPI backend with Groq Whisper and MiniMax LLM correction."""
 
+import json
 import os
+import re
 import tempfile
+import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+import httpx
+from dotenv import load_dotenv
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from groq import Groq
-from dotenv import load_dotenv
+from pydantic import BaseModel
 
 load_dotenv()
 
@@ -17,9 +22,35 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     raise RuntimeError("GROQ_API_KEY env var is required")
 
-client = Groq(api_key=GROQ_API_KEY)
+MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
+MINIMAX_BASE_URL = "https://api.minimax.io/v1"
+MINIMAX_MODEL = "MiniMax-M2.7"
+
+groq_client = Groq(api_key=GROQ_API_KEY)
 
 STATIC_DIR = Path(__file__).parent / "static"
+PROMPTS_FILE = Path(__file__).parent / "prompts.json"
+
+
+def _load_prompts() -> list:
+    if PROMPTS_FILE.exists():
+        return json.loads(PROMPTS_FILE.read_text(encoding="utf-8"))
+    return []
+
+
+def _save_prompts(prompts: list) -> None:
+    PROMPTS_FILE.write_text(
+        json.dumps(prompts, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+class PromptCreate(BaseModel):
+    prompt: str
+
+
+class CorrectRequest(BaseModel):
+    text: str
+    prompt: str
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -44,10 +75,75 @@ async def transcribe(file: UploadFile = File(...), language: str = Form("auto"))
 
             with open(tmp.name, "rb") as audio:
                 kwargs["file"] = audio
-                transcript = client.audio.transcriptions.create(**kwargs)
+                transcript = groq_client.audio.transcriptions.create(**kwargs)
 
             return JSONResponse({"text": transcript.text})
         except Exception as e:
             raise HTTPException(500, str(e))
         finally:
             os.unlink(tmp.name)
+
+
+@app.get("/api/prompts")
+async def get_prompts():
+    return _load_prompts()
+
+
+@app.post("/api/prompts")
+async def create_prompt(body: PromptCreate):
+    prompt_text = body.prompt.strip()
+    if not prompt_text:
+        raise HTTPException(400, "prompt is required")
+    words = prompt_text.split()
+    label = words[0] if words else prompt_text
+    prompts = _load_prompts()
+    item = {"id": str(uuid.uuid4()), "label": label, "prompt": prompt_text}
+    prompts.append(item)
+    _save_prompts(prompts)
+    return item
+
+
+@app.delete("/api/prompts/{prompt_id}")
+async def delete_prompt(prompt_id: str):
+    prompts = [p for p in _load_prompts() if p["id"] != prompt_id]
+    _save_prompts(prompts)
+    return {"ok": True}
+
+
+@app.post("/api/correct")
+async def correct_text(body: CorrectRequest):
+    text = body.text.strip()
+    prompt_text = body.prompt.strip()
+    if not text:
+        raise HTTPException(400, "text is required")
+    if not prompt_text:
+        raise HTTPException(400, "prompt is required")
+    if not MINIMAX_API_KEY:
+        raise HTTPException(500, "MINIMAX_API_KEY not configured")
+
+    async with httpx.AsyncClient() as http:
+        try:
+            r = await http.post(
+                f"{MINIMAX_BASE_URL}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {MINIMAX_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": MINIMAX_MODEL,
+                    "messages": [
+                        {"role": "user", "content": f"{prompt_text}\n\n{text}"}
+                    ],
+                },
+                timeout=30.0,
+            )
+            r.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(502, f"MiniMax error: {e.response.text}")
+        except Exception as e:
+            raise HTTPException(502, str(e))
+
+    result = r.json()
+    corrected = result["choices"][0]["message"]["content"]
+    corrected = re.sub(r"<think>.*?</think>", "", corrected, flags=re.DOTALL).strip()
+    return {"text": corrected}

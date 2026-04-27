@@ -11,9 +11,9 @@ body{font:16px/1.6 system-ui,sans-serif;background:#0d1117;color:#e6edf3;min-hei
 select{background:transparent;border:none;color:#8b949e;font:inherit;font-size:.85rem;cursor:pointer;padding:0;appearance:none;-webkit-appearance:none}
 select:focus{outline:none}
 select option{background:#0d1117;color:#e6edf3}
-textarea{width:100%;min-height:180px;background:transparent;border:none;color:#e6edf3;font:inherit;font-size:1.05rem;resize:none;line-height:1.7;caret-color:#58a6ff}
-textarea:focus{outline:none}
-textarea::placeholder{color:#30363d}
+#out{width:100%;min-height:180px;background:transparent;border:none;color:#e6edf3;font:inherit;font-size:1.05rem;resize:none;line-height:1.7;caret-color:#58a6ff}
+#out:focus{outline:none}
+#out::placeholder{color:#30363d}
 .row{display:flex;gap:8px}
 button{padding:10px 24px;border:none;border-radius:8px;font:inherit;font-size:.9rem;font-weight:600;cursor:pointer;transition:opacity .15s}
 button:active{opacity:.7}
@@ -22,16 +22,41 @@ button:disabled{opacity:.3;cursor:not-allowed}
 #rec.recording{background:#da3633}
 #copy{background:#21262d;color:#8b949e}
 #status{font-size:.8rem;color:#484f58}
+/* LLM bar */
+#llm-bar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:100%;padding-top:12px;border-top:1px solid #21262d}
+#add-form{display:none;flex-direction:column;gap:8px;width:100%}
+#new-prompt{width:100%;min-height:80px;background:#161b22;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font:inherit;font-size:.9rem;padding:8px;resize:none;text-align:left}
+#new-prompt:focus{outline:none;border-color:#58a6ff}
+#new-prompt::placeholder{color:#484f58}
+#save-prompt{background:#238636;color:#fff;padding:8px 20px}
+#cancel-prompt{background:#21262d;color:#8b949e;padding:8px 20px}
+.llm-btn{background:#21262d;color:#8b949e;padding:8px 16px;border-radius:20px;font-size:.85rem;font-weight:500;border:none;cursor:pointer;transition:opacity .15s,border-color .15s,color .15s}
+.llm-btn:hover{opacity:.85}
+.add-btn{background:transparent;border:1px dashed #30363d;color:#484f58;padding:6px 14px}
+.add-btn:hover{border-color:#58a6ff;color:#58a6ff;opacity:1}
+.prompt-wrapper{position:relative;display:inline-flex}
+.del{display:none;position:absolute;top:-6px;right:-6px;background:#da3633;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:16px;text-align:center;cursor:pointer;user-select:none;z-index:1}
+.prompt-wrapper:hover .del{display:block}
 </style>
 </head>
 <body>
 <div class="wrap">
   <select id="lang"></select>
-  <textarea id="out"></textarea>
+  <textarea id="out" placeholder="Your transcription will appear here…"></textarea>
   <div id="status">Ready</div>
   <div class="row">
     <button id="rec">Record</button>
     <button id="copy" disabled>Copy</button>
+  </div>
+  <div id="add-form">
+    <textarea id="new-prompt" placeholder="Enter prompt for text correction…"></textarea>
+    <div class="row" style="justify-content:flex-end">
+      <button id="cancel-prompt">Cancel</button>
+      <button id="save-prompt">Save</button>
+    </div>
+  </div>
+  <div id="llm-bar">
+    <button id="add-prompt" class="llm-btn add-btn">+</button>
   </div>
 </div>
 <script>
@@ -40,6 +65,12 @@ const out = document.getElementById('out');
 const copy = document.getElementById('copy');
 const status = document.getElementById('status');
 const lang = document.getElementById('lang');
+const llmBar = document.getElementById('llm-bar');
+const addPromptBtn = document.getElementById('add-prompt');
+const addForm = document.getElementById('add-form');
+const newPromptTA = document.getElementById('new-prompt');
+const savePromptBtn = document.getElementById('save-prompt');
+const cancelPromptBtn = document.getElementById('cancel-prompt');
 
 const LANGUAGES = [
   ['auto', 'Auto'],
@@ -104,7 +135,7 @@ rec.onclick = async () => {
 };
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'Space' && !rec.disabled && document.activeElement !== out) {
+  if (e.code === 'Space' && !rec.disabled && document.activeElement !== out && document.activeElement !== newPromptTA) {
     e.preventDefault();
     rec.click();
   }
@@ -115,6 +146,89 @@ copy.onclick = () => {
     copy.textContent = 'Copied!';
     setTimeout(() => copy.textContent = 'Copy', 1200);
   });
+};
+
+// LLM prompt buttons
+
+function makePromptButton(p) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'prompt-wrapper';
+
+  const btn = document.createElement('button');
+  btn.className = 'llm-btn';
+  btn.textContent = p.label;
+  btn.onclick = async () => {
+    const text = out.value.trim();
+    if (!text) return;
+    status.textContent = 'Correcting…';
+    btn.disabled = true;
+    try {
+      const r = await fetch('/api/correct', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text, prompt: p.prompt}),
+      });
+      if (!r.ok) { const t = await r.text(); throw new Error(t); }
+      const j = await r.json();
+      if (j.text) { out.value = j.text; copy.disabled = false; }
+    } catch(e) {
+      status.textContent = 'Error';
+      setTimeout(() => status.textContent = 'Ready', 2000);
+      return;
+    } finally {
+      btn.disabled = false;
+    }
+    status.textContent = 'Ready';
+  };
+
+  const del = document.createElement('span');
+  del.className = 'del';
+  del.textContent = '×';
+  del.onclick = async () => {
+    await fetch(`/api/prompts/${p.id}`, {method: 'DELETE'});
+    wrapper.remove();
+  };
+
+  wrapper.appendChild(btn);
+  wrapper.appendChild(del);
+  return wrapper;
+}
+
+async function loadPrompts() {
+  try {
+    const r = await fetch('/api/prompts');
+    const prompts = await r.json();
+    prompts.forEach(p => llmBar.appendChild(makePromptButton(p)));
+  } catch(e) {}
+}
+
+loadPrompts(); // async, doesn't block page load
+
+addPromptBtn.onclick = () => {
+  addForm.style.display = 'flex';
+  newPromptTA.focus();
+};
+
+cancelPromptBtn.onclick = () => {
+  addForm.style.display = 'none';
+  newPromptTA.value = '';
+};
+
+savePromptBtn.onclick = async () => {
+  const promptText = newPromptTA.value.trim();
+  if (!promptText) return;
+  try {
+    const r = await fetch('/api/prompts', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({prompt: promptText}),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const p = await r.json();
+    llmBar.appendChild(makePromptButton(p));
+    addForm.style.display = 'none';
+    newPromptTA.value = '';
+  } catch(e) {}
 };
 </script>
 </body>

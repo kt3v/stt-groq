@@ -3,3 +3,4 @@ python-multipart
 uvicorn[standard]
 groq
 python-dotenv
+httpx
