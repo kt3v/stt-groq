@@ -241,9 +241,14 @@ rec.onclick = async () => {
 };
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'Space' && !rec.disabled && document.activeElement !== out && document.activeElement !== newPromptTA && pwModal.style.display === 'none') {
+  const typing = document.activeElement === out || document.activeElement === newPromptTA || document.activeElement === pwInput;
+  if (e.code === 'Space' && !rec.disabled && !typing && pwModal.style.display !== 'flex') {
     e.preventDefault();
     rec.click();
+  }
+  if (e.code === 'KeyC' && !e.ctrlKey && !e.metaKey && !typing) {
+    e.preventDefault();
+    copy.click();
   }
 });
 

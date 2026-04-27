@@ -14,7 +14,7 @@ Minimal speech-to-text web app powered by [Groq](https://groq.com) Whisper API â
 - Optional password protection (`APP_PASSWORD`) with session tokens
 - Custom LLM text correction via MiniMax (`MiniMax-M2.7`) with user-defined prompts
 - Persistent prompt management (create / delete) stored in `prompts.json`
-- Spacebar shortcut to toggle recording
+- Keyboard shortcuts: `Space` to toggle recording, `C` to copy (layout-independent)
 - One-click copy to clipboard
 
 ## Quick Start
