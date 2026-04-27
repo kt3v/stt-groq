@@ -250,6 +250,10 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     copy.click();
   }
+  if (e.code === 'KeyX' && !e.ctrlKey && !e.metaKey && !typing) {
+    e.preventDefault();
+    clearBtn.click();
+  }
 });
 
 clearBtn.onclick = () => { out.value = ''; };
