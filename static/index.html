@@ -6,44 +6,47 @@
 <title>STT Groq</title>
 <style>
 *{margin:0;box-sizing:border-box}
-body{font:16px/1.6 system-ui,sans-serif;background:#0d1117;color:#e6edf3;min-height:100vh;display:flex;align-items:center;justify-content:center}
+body{font:16px/1.6 system-ui,sans-serif;background:#000;color:#e6edf3;min-height:100vh;display:flex;align-items:center;justify-content:center}
 .wrap{width:min(520px,90vw);display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center}
-select{background:transparent;border:none;color:#8b949e;font:inherit;font-size:.85rem;cursor:pointer;padding:0;appearance:none;-webkit-appearance:none}
+select{background:#1a2d42;border:none;color:#7eb8d8;font:inherit;font-size:.85rem;font-weight:500;cursor:pointer;padding:8px 16px;border-radius:20px;appearance:none;-webkit-appearance:none;text-align:center;text-align-last:center}
 select:focus{outline:none}
-select option{background:#0d1117;color:#e6edf3}
+select option{background:#111;color:#e6edf3}
 #out{width:100%;min-height:180px;background:transparent;border:none;color:#e6edf3;font:inherit;font-size:1.05rem;resize:none;line-height:1.7;caret-color:#58a6ff}
 #out:focus{outline:none}
-#out::placeholder{color:#30363d}
+#out::-webkit-scrollbar{width:6px}
+#out::-webkit-scrollbar-track{background:transparent}
+#out::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
 .row{display:flex;gap:8px}
 button{padding:10px 24px;border:none;border-radius:8px;font:inherit;font-size:.9rem;font-weight:600;cursor:pointer;transition:opacity .15s}
 button:active{opacity:.7}
 button:disabled{opacity:.3;cursor:not-allowed}
-#rec{background:#238636;color:#fff}
-#rec.recording{background:#da3633}
-#copy{background:#21262d;color:#8b949e}
+#rec{background:#d1d5db;color:#000}
+#rec.recording{background:#da3633;color:#fff}
+#clear{background:#2d1a0e;color:#d4844e}
+#copy{background:#2d2b10;color:#d4b84e}
 #status{font-size:.8rem;color:#484f58}
 /* LLM bar */
-#llm-bar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:100%;padding-top:12px;border-top:1px solid #21262d}
+#llm-bar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:100%;padding-top:12px;border-top:1px solid #1a1a1a}
 #add-form{display:none;flex-direction:column;gap:8px;width:100%}
-#new-prompt{width:100%;min-height:80px;background:#161b22;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font:inherit;font-size:.9rem;padding:8px;resize:none;text-align:left}
+#new-prompt{width:100%;min-height:80px;background:#111;border:1px solid #2a2a2a;border-radius:8px;color:#e6edf3;font:inherit;font-size:.9rem;padding:8px;resize:none;text-align:left}
 #new-prompt:focus{outline:none;border-color:#58a6ff}
 #new-prompt::placeholder{color:#484f58}
-#save-prompt{background:#238636;color:#fff;padding:8px 20px}
-#cancel-prompt{background:#21262d;color:#8b949e;padding:8px 20px}
-.llm-btn{background:#21262d;color:#8b949e;padding:8px 16px;border-radius:20px;font-size:.85rem;font-weight:500;border:none;cursor:pointer;transition:opacity .15s,border-color .15s,color .15s}
+#save-prompt{background:#d1d5db;color:#000;padding:8px 20px}
+#cancel-prompt{background:#1a1a1a;color:#8b949e;padding:8px 20px}
+.llm-btn{background:#1a2d42;color:#7eb8d8;padding:8px 16px;border-radius:20px;font-size:.85rem;font-weight:500;border:none;cursor:pointer;transition:opacity .15s,border-color .15s,color .15s}
 .llm-btn:hover{opacity:.85}
-.add-btn{background:transparent;border:1px dashed #30363d;color:#484f58;padding:6px 14px}
+.add-btn{background:transparent;border:1px dashed #2a2a2a;color:#484f58;padding:6px 14px}
 .add-btn:hover{border-color:#58a6ff;color:#58a6ff;opacity:1}
 .prompt-wrapper{position:relative;display:inline-flex}
 .del{display:none;position:absolute;top:-6px;right:-6px;background:#da3633;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:16px;text-align:center;cursor:pointer;user-select:none;z-index:1}
 .prompt-wrapper:hover .del{display:block}
 /* Password modal */
-#pw-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);align-items:center;justify-content:center;z-index:100}
-#pw-box{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:32px 28px;display:flex;flex-direction:column;gap:14px;width:min(300px,90vw);text-align:center}
+#pw-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);align-items:center;justify-content:center;z-index:100}
+#pw-box{background:#111;border:1px solid #2a2a2a;border-radius:12px;padding:32px 28px;display:flex;flex-direction:column;gap:14px;width:min(300px,90vw);text-align:center}
 #pw-box h2{font-size:.95rem;font-weight:600;color:#8b949e;margin:0}
-#pw-input{background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font:inherit;font-size:1rem;padding:10px 14px;width:100%;text-align:center;letter-spacing:.1em}
+#pw-input{background:#000;border:1px solid #2a2a2a;border-radius:8px;color:#e6edf3;font:inherit;font-size:1rem;padding:10px 14px;width:100%;text-align:center;letter-spacing:.1em}
 #pw-input:focus{outline:none;border-color:#58a6ff}
-#pw-submit{background:#238636;color:#fff;width:100%;padding:10px}
+#pw-submit{background:#d1d5db;color:#000;width:100%;padding:10px}
 #pw-error{color:#f85149;font-size:.8rem;min-height:1em}
 </style>
 </head>
@@ -62,11 +65,12 @@ button:disabled{opacity:.3;cursor:not-allowed}
 
 <div class="wrap">
   <select id="lang"></select>
-  <textarea id="out" placeholder="Your transcription will appear here…"></textarea>
+  <textarea id="out"></textarea>
   <div id="status">Ready</div>
   <div class="row">
-    <button id="rec">Record</button>
-    <button id="copy" disabled>Copy</button>
+    <button id="clear">Clear</button>
+    <button id="rec"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="22" height="22" style="display:block" fill="currentColor"><path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-1.5 4v6a1.5 1.5 0 0 0 3 0V5a1.5 1.5 0 0 0-3 0zM6 10a1 1 0 0 1 1 1 5 5 0 0 0 10 0 1 1 0 1 1 2 0 7 7 0 0 1-6 6.92V20h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.08A7 7 0 0 1 5 11a1 1 0 0 1 1-1z"/></svg></button>
+    <button id="copy">Copy</button>
   </div>
   <div id="add-form">
     <textarea id="new-prompt" placeholder="Enter prompt for text correction…"></textarea>
@@ -81,8 +85,10 @@ button:disabled{opacity:.3;cursor:not-allowed}
 </div>
 <script>
 const rec = document.getElementById('rec');
+const recIcon = rec.innerHTML;
 const out = document.getElementById('out');
 const copy = document.getElementById('copy');
+const clearBtn = document.getElementById('clear');
 const status = document.getElementById('status');
 const lang = document.getElementById('lang');
 const llmBar = document.getElementById('llm-bar');
@@ -204,7 +210,7 @@ rec.onclick = async () => {
     mediaRec.onstop = async () => {
       stream.getTracks().forEach(t => t.stop());
       mediaRec = null;
-      rec.textContent = 'Record';
+      rec.innerHTML = recIcon;
       rec.classList.remove('recording');
       rec.disabled = true;
 
@@ -218,7 +224,6 @@ rec.onclick = async () => {
         const r = await fetchWithAuth('/api/transcribe', {method:'POST', body:fd});
         const j = await r.json();
         out.value = j.text || '';
-        copy.disabled = !out.value;
       } catch(e) {
         out.value = 'Error: ' + e.message;
       } finally {
@@ -227,7 +232,7 @@ rec.onclick = async () => {
       }
     };
     mediaRec.start();
-    rec.textContent = 'Stop';
+    rec.innerHTML = 'Stop';
     rec.classList.add('recording');
     status.textContent = 'Recording...';
   } else {
@@ -241,6 +246,8 @@ document.addEventListener('keydown', e => {
     rec.click();
   }
 });
+
+clearBtn.onclick = () => { out.value = ''; };
 
 copy.onclick = () => {
   navigator.clipboard.writeText(out.value).then(() => {
@@ -272,7 +279,7 @@ function makePromptButton(p) {
       });
       if (!r.ok) { const t = await r.text(); throw new Error(t); }
       const j = await r.json();
-      if (j.text) { out.value = j.text; copy.disabled = false; }
+      if (j.text) { out.value = j.text; }
     } catch(e) {
       status.textContent = 'Error';
       setTimeout(() => status.textContent = 'Ready', 2000);
