@@ -7,30 +7,31 @@
 <style>
 *{margin:0;box-sizing:border-box}
 body{font:16px/1.6 system-ui,sans-serif;background:#0d1117;color:#e6edf3;min-height:100vh;display:flex;align-items:center;justify-content:center}
-.card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;width:min(480px,90vw)}
-h1{font-size:1.3rem;margin-bottom:16px;font-weight:600}
-textarea{width:100%;min-height:120px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;padding:12px;font:inherit;resize:vertical;margin-bottom:12px}
-textarea:focus{outline:none;border-color:#58a6ff}
-.row{display:flex;gap:8px;flex-wrap:wrap}
-button{flex:1;padding:10px 0;border:none;border-radius:8px;font:inherit;font-weight:600;cursor:pointer;transition:opacity .15s}
+.wrap{width:min(520px,90vw);display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center}
+select{background:transparent;border:none;color:#8b949e;font:inherit;font-size:.85rem;cursor:pointer;padding:0;appearance:none;-webkit-appearance:none}
+select:focus{outline:none}
+select option{background:#0d1117;color:#e6edf3}
+textarea{width:100%;min-height:180px;background:transparent;border:none;color:#e6edf3;font:inherit;font-size:1.05rem;resize:none;line-height:1.7;caret-color:#58a6ff}
+textarea:focus{outline:none}
+textarea::placeholder{color:#30363d}
+.row{display:flex;gap:8px}
+button{padding:10px 24px;border:none;border-radius:8px;font:inherit;font-size:.9rem;font-weight:600;cursor:pointer;transition:opacity .15s}
 button:active{opacity:.7}
-button:disabled{opacity:.4;cursor:not-allowed}
-#rec{background:#238636;color:#fff;min-width:120px}
+button:disabled{opacity:.3;cursor:not-allowed}
+#rec{background:#238636;color:#fff}
 #rec.recording{background:#da3633}
-#copy{background:#30363d;color:#e6edf3}
-#lang{background:#30363d;color:#e6edf3;border:none;border-radius:8px;padding:10px 8px;font:inherit;cursor:pointer}
-#status{margin:12px 0;font-size:.85rem;color:#8b949e}
+#copy{background:#21262d;color:#8b949e}
+#status{font-size:.8rem;color:#484f58}
 </style>
 </head>
 <body>
-<div class="card">
-  <h1>🎙 STT Groq</h1>
-  <textarea id="out" readonly placeholder="Transcription will appear here…"></textarea>
+<div class="wrap">
+  <select id="lang"></select>
+  <textarea id="out"></textarea>
   <div id="status">Ready</div>
   <div class="row">
     <button id="rec">Record</button>
     <button id="copy" disabled>Copy</button>
-    <select id="lang"></select>
   </div>
 </div>
 <script>
@@ -43,7 +44,7 @@ const lang = document.getElementById('lang');
 const LANGUAGES = [
   ['auto', 'Auto'],
   ['en', 'English'],
-  ['ru', 'Russian'],
+  ['ru', 'Slavic'],
   ['de', 'Deutsch'],
   ['fr', 'Français'],
   ['es', 'Español'],
@@ -64,7 +65,6 @@ let mediaRec = null, chunks = [];
 
 rec.onclick = async () => {
   if (!mediaRec) {
-    /* start */
     chunks = [];
     const stream = await navigator.mediaDevices.getUserMedia({audio:true});
     mediaRec = new MediaRecorder(stream);
@@ -99,7 +99,6 @@ rec.onclick = async () => {
     rec.classList.add('recording');
     status.textContent = 'Recording...';
   } else {
-    /* stop */
     mediaRec.stop();
   }
 };
