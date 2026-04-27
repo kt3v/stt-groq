@@ -167,7 +167,17 @@ async def correct_text(body: CorrectRequest):
                 json={
                     "model": MINIMAX_MODEL,
                     "messages": [
-                        {"role": "user", "content": f"{prompt_text}\n\n{text}"}
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are a text processing assistant. "
+                                "Output ONLY the result of the requested operation — "
+                                "no explanations, no preamble, no quotes, no labels like "
+                                "'Here is the translation:' or 'Result:'. "
+                                "Return the processed text and nothing else."
+                            ),
+                        },
+                        {"role": "user", "content": f"{prompt_text}\n\n{text}"},
                     ],
                 },
                 timeout=30.0,
