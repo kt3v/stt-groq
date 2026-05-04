@@ -37,9 +37,10 @@ PROMPTS_FILE = Path(__file__).parent / "prompts.json"
 
 
 def _load_prompts() -> list:
-    if PROMPTS_FILE.exists():
-        return json.loads(PROMPTS_FILE.read_text(encoding="utf-8"))
-    return []
+    if not PROMPTS_FILE.exists():
+        _save_prompts([])
+        return []
+    return json.loads(PROMPTS_FILE.read_text(encoding="utf-8"))
 
 
 def _save_prompts(prompts: list) -> None:
@@ -95,7 +96,9 @@ async def index():
 
 @app.get("/manifest.json")
 async def manifest():
-    return FileResponse(STATIC_DIR / "manifest.json", media_type="application/manifest+json")
+    return FileResponse(
+        STATIC_DIR / "manifest.json", media_type="application/manifest+json"
+    )
 
 
 @app.get("/sw.js")
